@@ -56,7 +56,7 @@
                     class="btn btn-sm"
                     [disabled]="prod.stock === 0"
                     [ngClass]="prod.stock === 0 ? 'btn-danger' : 'btn-outline-dark'"
-                    (click)="sell(prod); $event.stopPropagation()">
+                    (click)="sell(prod.sku); $event.stopPropagation()">
                     Sell
                   </button>
                 </td>
@@ -155,7 +155,12 @@
               productForm.get('sku')?.touched
             ">
             <div class="invalid-feedback">
-              จำเป็นต้องกรอกข้อมูล
+              @if(productForm.get('sku')?.errors?.['required']){
+                กรุณากรอกรหัสสินค้า
+              }
+              @else if (productForm.get('sku')?.errors?.['duplicateSku']) {
+                มีรหัสสินค้านี้อยู่แล้ว
+              }
             </div>
           </div>
           <div class="mb-3">
