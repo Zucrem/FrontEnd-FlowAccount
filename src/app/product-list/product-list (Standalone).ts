@@ -1,10 +1,9 @@
 import { Component, signal, computed, ChangeDetectorRef, Signal } from '@angular/core';
 import { DatePipe, CurrencyPipe, NgClass } from '@angular/common';
-import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { interval, Subscription } from 'rxjs';
 
 import { Product } from '../model/product.model';
-import { ProductService } from '../product.service';
 
 declare var bootstrap: any;
 
@@ -18,7 +17,82 @@ export class ProductList {
 
   productForm!: FormGroup;
   private refreshSub?: Subscription;
-  productList!: Signal<Product[]>;
+  productList = signal<Product[]>([
+    {
+      id : 1,
+      sku: "FOOD001",
+      name: "ข้าวผัดหมู",
+      category: "อาหาร",
+      price: 45,
+      stock: 20,
+      createdAt: new Date(),
+    },
+    {
+      id : 2,
+      sku: "FOOD002",
+      name: "ข้าวผัดไก่",
+      category: "อาหาร",
+      price: 45,
+      stock: 20,
+      createdAt: new Date(),
+    },
+    {
+      id : 3,
+      sku: "CLOTH001",
+      name: "เสื้อ",
+      category: "เสื้อผ้า",
+      price: 45,
+      stock: 20,
+      createdAt: new Date(),
+    },
+    {
+      id : 4,
+      sku: "CLOTH002",
+      name: "กางเกง",
+      category: "เสื้อผ้า",
+      price: 45,
+      stock: 20,
+      createdAt: new Date(),
+    },
+    {
+      id : 5,
+      sku: "ITEM001",
+      name: "แก้วน้ำ",
+      category: "ของใช้",
+      price: 45,
+      stock: 20,
+      createdAt: new Date(),
+    },
+    {
+      id : 6,
+      sku: "ITEM002",
+      name: "ปากกา",
+      category: "ของใช้",
+      price: 45,
+      stock: 20,
+      createdAt: new Date(),
+    },
+    {
+      id : 7,
+      sku: "DRINK001",
+      name: "น้ำเปล่า",
+      category: "เครื่องดื่ม",
+      price: 45,
+      stock: 20,
+      createdAt: new Date(),
+    },
+    {
+      id : 8,
+      sku: "DRINK002",
+      name: "โซดา",
+      category: "เครื่องดื่ม",
+      price: 45,
+      stock: 20,
+      createdAt: new Date(),
+    }
+  ]);
+
+  
   
   selectedCategory = signal<string>('All');
   selectedProduct !: Product;
@@ -29,19 +103,16 @@ export class ProductList {
 
   constructor(
     private fb: FormBuilder,
-    private productService: ProductService,
     private cdr: ChangeDetectorRef
   ) {
     this.productForm = this.fb.group({
       id: [{value:'', disabled:true}],
-      sku: ['', Validators.required],
+      sku: ['', [Validators.required, this.duplicateSkuValidator()]],
       name: ['', [Validators.required, Validators.minLength(3)]],
       category: ['', Validators.required],
       price: ['', [Validators.required, Validators.min(0.01)]],
       stock: ['', [Validators.required, Validators.min(1)]]
     });
-
-    this.productList = this.productService.productList;
   }
 
   totalProducts = computed(() =>
@@ -74,53 +145,6 @@ export class ProductList {
     return products.filter(p => p.category === category);
   })
   
-  // productList: Product[] = [
-  //   {
-  //     id : 1,
-  //     sku: "WH-001-BLK",
-  //     name: "Wireless Headphones",
-  //     category: "Electronics",
-  //     price: 9.9,
-  //     stock: 245,
-  //     createdAt: new Date(),
-  //   },
-  //   {
-  //     id : 2,
-  //     sku: "KB-102-RGB",
-  //     name: "Mechanical Keyboard",
-  //     category: "Electronics",
-  //     price: 89.99,
-  //     stock: 32,
-  //     createdAt: new Date(),
-  //   },
-  //   {
-  //     id : 3,
-  //     sku: "MS-203-WHT",
-  //     name: "Ergonomic Mouse",
-  //     category: "Electronics",
-  //     price: 89.99,
-  //     stock: 0,
-  //     createdAt: new Date(),
-  //   },
-  //   {
-  //     id : 4,
-  //     sku: "CH-405-BLK",
-  //     name: "Office Chair",
-  //     category: "Furniture",
-  //     price: 299.99,
-  //     stock: 18,
-  //     createdAt: new Date(),
-  //   }
-  // ]
-
-  ngOnInit(){
-      this.productService.loadProducts();
-
-      this.refreshSub = interval(10_000).subscribe(() => {
-        this.productService.loadProducts();
-      });
-  }
-
   ngOnDestroy() {
     this.refreshSub?.unsubscribe();
   }
@@ -161,16 +185,13 @@ export class ProductList {
 
 
   sell(sku:string){
-    this.productService.sellProduct(sku,1)
-    .subscribe({
-      next: res => {
-        const toastEl = document.getElementById('sellToast');
+    this.productList.update(list => 
+      list.map(e => 
+        e.sku == sku && e.stock > 0 ? {...e, stock:e.stock - 1} : e
+      ))
+      
+      const toastEl = document.getElementById('sellToast');
         new bootstrap.Toast(toastEl).show();
-      },
-      error: err => {
-        console.error(err)  
-      }
-    });
   }
 
   resetForm() {
@@ -185,20 +206,24 @@ export class ProductList {
   submitForm(){
     const prod: Product = this.productForm.getRawValue();
 
-    this.productService.addProduct(prod)
-    .subscribe({
-      next: () => {
-        // close form modal
-        const formModalEl = document.getElementById('productFormModal');
-        bootstrap.Modal.getInstance(formModalEl)?.hide();
+    this.productList.update(list =>
+      list = [...list,prod]
+    )
 
-        // open success modal
-        this.openStatusModal(true, "เพิ่มสินค้าสำเร็จ")
-      },
-      error: err => {
-        let errlist:[] = err.error[0].error;
-        this.openStatusModal(false, errlist.join(", "))
-      }
-    });
+    // close form modal
+    const formModalEl = document.getElementById('productFormModal');
+    bootstrap.Modal.getInstance(formModalEl)?.hide();
+    // open success modal
+    this.openStatusModal(true, "เพิ่มสินค้าสำเร็จ")
+  }
+
+  duplicateSkuValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value;
+      if (!value) return null;
+
+      const exists = this.productList().some(p => p.sku === value);
+      return exists ? { duplicateSku: true } : null;
+    };
   }
 }

@@ -3,14 +3,17 @@ import { Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 
 import { Product } from './model/product.model';
+import { AppConfigService } from './app-config.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ProductService {
-  private readonly API_URL = 'https://localhost:7088/product';
+  private API_URL !: string ;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private appConfig: AppConfigService) {
+    this.API_URL = this.appConfig.apiUrl
+  }
   
   productList = signal<Product[]>([]);
   
